@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloraMagic Wand - Interactive Flower Wand Experience</title>
+  <meta name="description" content="An interactive web experience where your hand or mouse movement creates blooming procedural flowers, magical sound chimes, and particle trails.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- MediaPipe Hands CDN for Camera Gesture Control -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Background Animated Cosmic Gradient & Canvas Layer -->
+  <div class="app-container">
+    <canvas id="starfieldCanvas"></canvas>
+    <canvas id="flowerCanvas"></canvas>
+    <canvas id="wandTrailCanvas"></canvas>
+
+    <!-- Hidden Video Element for MediaPipe Hand Tracking -->
+    <video id="webcamVideo" playsinline style="display: none;"></video>
+
+    <!-- Top Header HUD -->
+    <header class="top-hud">
+      <div class="brand">
+        <div class="wand-icon">✨</div>
+        <div class="brand-text">
+          <h1>FloraMagic Wand</h1>
+          <p>Move mouse / finger to bloom interactive flowers</p>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button id="autoMagicBtn" class="btn btn-glass" title="Toggle Auto Mandala Drawing">
+          <span class="btn-icon">🌀</span> Auto Draw
+        </button>
+        <button id="audioToggleBtn" class="btn btn-glass" title="Toggle Magical Chimes Audio">
+          <span class="btn-icon" id="audioIcon">🔊</span> Sound ON
+        </button>
+        <button id="cameraToggleBtn" class="btn btn-glass" title="Toggle Camera Hand Tracking">
+          <span class="btn-icon">📷</span> Hand Track
+        </button>
+        <button id="clearCanvasBtn" class="btn btn-danger-glass" title="Clear Screen">
+          <span class="btn-icon">🧹</span> Clear
+        </button>
+        <button id="snapshotBtn" class="btn btn-primary" title="Export Floral Artwork as PNG">
+          <span class="btn-icon">📸</span> Save Wallpaper
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Floating Glass Control Panel -->
+    <aside class="control-panel glass-card" id="controlPanel">
+      <div class="panel-header">
+        <h2><span class="header-icon">🎨</span> Wand & Bloom Controls</h2>
+        <button id="collapsePanelBtn" class="icon-only-btn" title="Toggle Panel"><span>‹</span></button>
+      </div>
+
+      <div class="panel-body">
+        
+        <!-- Preset Themes -->
+        <div class="control-group">
+          <label class="group-title">Flower Style Theme</label>
+          <div class="theme-grid">
+            <button class="theme-card active" data-theme="sakura">
+              <span class="theme-icon">🌸</span>
+              <span class="theme-label">Sakura</span>
+            </button>
+            <button class="theme-card" data-theme="lotus">
+              <span class="theme-icon">🪷</span>
+              <span class="theme-label">Neon Lotus</span>
+            </button>
+            <button class="theme-card" data-theme="rose">
+              <span class="theme-icon">🌹</span>
+              <span class="theme-label">Rose</span>
+            </button>
+            <button class="theme-card" data-theme="sunflower">
+              <span class="theme-icon">🌻</span>
+              <span class="theme-label">Solar</span>
+            </button>
+            <button class="theme-card" data-theme="cosmos">
+              <span class="theme-icon">🌌</span>
+              <span class="theme-label">Cosmos</span>
+            </button>
+            <button class="theme-card" data-theme="custom">
+              <span class="theme-icon">🎨</span>
+              <span class="theme-label">Custom</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Color Pickers (Visible when Custom Theme active) -->
+        <div class="control-group custom-color-group" id="customColorGroup" style="display: none;">
+          <label class="group-title">Custom Palette</label>
+          <div class="color-picker-row">
+            <div class="color-picker-item">
+              <span>Petal</span>
+              <input type="color" id="petalColorInput" value="#ff4b8b">
+            </div>
+            <div class="color-picker-item">
+              <span>Pistil</span>
+              <input type="color" id="pistilColorInput" value="#ffd700">
+            </div>
+            <div class="color-picker-item">
+              <span>Leaf</span>
+              <input type="color" id="leafColorInput" value="#2ecc71">
+            </div>
+          </div>
+        </div>
+
+        <!-- Wand Operating Mode -->
+        <div class="control-group">
+          <label class="group-title">Wand Mode</label>
+          <div class="segmented-control">
+            <button class="seg-btn active" data-mode="stream">🌸 Stream</button>
+            <button class="seg-btn" data-mode="burst">💥 Burst</button>
+            <button class="seg-btn" data-mode="vine">🌿 Vine</button>
+          </div>
+        </div>
+
+        <!-- Wand Trail Effect -->
+        <div class="control-group">
+          <label class="group-title">Wand Trail Style</label>
+          <select id="wandStyleSelect" class="glass-select">
+            <option value="stardust">✨ Stardust Sparkles</option>
+            <option value="firefly">💡 Glowing Fireflies</option>
+            <option value="ribbon">🎗️ Rainbow Ribbon</option>
+            <option value="crystal">💎 Crystal Shards</option>
+          </select>
+        </div>
+
+        <!-- Physics Sliders -->
+        <div class="control-group">
+          <div class="slider-row">
+            <label for="flowerSizeSlider">Bloom Scale</label>
+            <span class="slider-val" id="flowerSizeVal">1.0x</span>
+          </div>
+          <input type="range" id="flowerSizeSlider" min="0.4" max="2.5" step="0.1" value="1.0" class="glass-range">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-row">
+            <label for="densitySlider">Spawn Density</label>
+            <span class="slider-val" id="densityVal">Medium</span>
+          </div>
+          <input type="range" id="densitySlider" min="1" max="5" step="1" value="3" class="glass-range">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-row">
+            <label for="windSlider">Petal Breeze</label>
+            <span class="slider-val" id="windVal">Gentle</span>
+          </div>
+          <input type="range" id="windSlider" min="0" max="10" step="1" value="3" class="glass-range">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-row">
+            <label for="petalCountSlider">Petal Count</label>
+            <span class="slider-val" id="petalCountVal">8</span>
+          </div>
+          <input type="range" id="petalCountSlider" min="4" max="20" step="1" value="8" class="glass-range">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-row">
+            <label for="audioVolSlider">Chime Volume</label>
+            <span class="slider-val" id="audioVolVal">70%</span>
+          </div>
+          <input type="range" id="audioVolSlider" min="0" max="100" step="5" value="70" class="glass-range">
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Bottom Instruction Bar & Camera Status -->
+    <footer class="bottom-hud">
+      <div class="hint-badge" id="hintBadge">
+        <span class="hint-icon">💡</span>
+        <span id="hintText">Move mouse or drag finger to bloom flowers. Click/Tap for blossom bursts!</span>
+      </div>
+
+      <div class="stats-badge" id="statsBadge">
+        <span id="flowerCount">0 Flowers</span> • <span id="fpsCount">60 FPS</span>
+      </div>
+    </footer>
+
+    <!-- Hand Tracking Camera Feed Indicator Modal / PIP -->
+    <div id="cameraPip" class="camera-pip glass-card" style="display: none;">
+      <div class="pip-header">
+        <span>📷 Camera Tracking Active</span>
+        <button id="closePipBtn" class="icon-btn">×</button>
+      </div>
+      <div class="pip-body">
+        <canvas id="cameraDebugCanvas" width="160" height="120"></canvas>
+        <p class="pip-status" id="pipStatus">Detecting hand gestures...</p>
+      </div>
+      <div class="pip-guide">
+        <small>👆 Index Finger = Wand Tip</small><br>
+        <small>🤌 Pinch = Burst Bloom</small><br>
+        <small>✋ Open Palm = Clear Petals</small>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript Files -->
+  <script src="js/audioSynth.js"></script>
+  <script src="js/flowerRenderer.js"></script>
+  <script src="js/wandEngine.js"></script>
+  <script src="js/handTracker.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
